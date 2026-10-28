@@ -1,4 +1,4 @@
-name: Build and push Flasker image
+name: Build, scan, and publish Flasker image
 
 on:
   push:
@@ -13,11 +13,21 @@ permissions:
   contents: read
 
 jobs:
-  build-and-push:
+  build-scan-publish:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
         uses: actions/checkout@v6
+
+      - name: Build image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          load: true
+          tags: |
+            anushkaag10/flasker:latest
+            anushkaag10/flasker:${{ github.sha }}
 
       - name: Log in to Docker Hub
         if: github.ref == 'refs/heads/main'
@@ -26,12 +36,19 @@ jobs:
           username: anushkaag10
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push image
-        uses: docker/build-push-action@v7
+      - name: Scan for fixable critical and high vulnerabilities
+        if: github.ref == 'refs/heads/main'
+        uses: docker/scout-action@v1
         with:
-          context: .
-          push: ${{ github.ref == 'refs/heads/main' }}
-          tags: |
-            anushkaag10/flasker:latest
-            anushkaag10/flasker:${{ github.sha }}
+          command: cves
+          image: local://anushkaag10/flasker:latest
+          only-fixed: true
+          only-severities: critical,high
+          exit-code: true
+
+      - name: Push image to Docker Hub
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker push anushkaag10/flasker:latest
+          docker push anushkaag10/flasker:${{ github.sha }}
 
