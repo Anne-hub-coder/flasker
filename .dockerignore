@@ -15,4 +15,8 @@ README.md
 *.zip
 *.tar.gz
 tests/
+venv/
+.venv/
+dist/
+build/
 
