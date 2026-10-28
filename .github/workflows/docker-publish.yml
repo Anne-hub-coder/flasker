@@ -19,15 +19,20 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v6
 
-      - name: Build image
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build AMD64 image for scanning
         uses: docker/build-push-action@v7
         with:
           context: .
+          platforms: linux/amd64
           push: false
           load: true
-          tags: |
-            anushkaag10/flasker:latest
-            anushkaag10/flasker:${{ github.sha }}
+          tags: anushkaag10/flasker:scan
 
       - name: Log in to Docker Hub
         if: github.ref == 'refs/heads/main'
@@ -36,19 +41,45 @@ jobs:
           username: anushkaag10
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Scan for fixable critical and high vulnerabilities
+      - name: Scan AMD64 image
         if: github.ref == 'refs/heads/main'
         uses: docker/scout-action@v1
         with:
           command: cves
-          image: local://anushkaag10/flasker:latest
+          image: local://anushkaag10/flasker:scan
+          platform: linux/amd64
           only-fixed: true
           only-severities: critical,high
           exit-code: true
 
-      - name: Push image to Docker Hub
+      - name: Build ARM64 image for scanning
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/arm64
+          push: false
+          load: true
+          tags: anushkaag10/flasker:scan
+
+      - name: Scan ARM64 image
         if: github.ref == 'refs/heads/main'
-        run: |
-          docker push anushkaag10/flasker:latest
-          docker push anushkaag10/flasker:${{ github.sha }}
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: local://anushkaag10/flasker:scan
+          platform: linux/arm64
+          only-fixed: true
+          only-severities: critical,high
+          exit-code: true
+
+      - name: Publish multi-platform image
+        if: github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            anushkaag10/flasker:latest
+            anushkaag10/flasker:${{ github.sha }}
 
